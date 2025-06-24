@@ -48,40 +48,59 @@ export function WhiteboardCanvas({
 
       switch (element.type) {
         case "path":
-          if (element.data.length > 1) {
+          if (element.data.points && element.data.points.length > 1) {
             ctx.beginPath();
-            ctx.moveTo(element.data[0].x, element.data[0].y);
-            element.data.forEach((point: { x: number; y: number }) => {
+            ctx.moveTo(element.data.points[0].x, element.data.points[0].y);
+            element.data.points.forEach((point: { x: number; y: number }) => {
               ctx.lineTo(point.x, point.y);
             });
             ctx.stroke();
           }
           break;
         case "rectangle":
-          ctx.beginPath();
-          ctx.rect(
-            element.data.x,
-            element.data.y,
-            element.data.width,
-            element.data.height
-          );
-          ctx.stroke();
+          if (
+            element.data.x !== undefined &&
+            element.data.y !== undefined &&
+            element.data.width !== undefined &&
+            element.data.height !== undefined
+          ) {
+            ctx.beginPath();
+            ctx.rect(
+              element.data.x,
+              element.data.y,
+              element.data.width,
+              element.data.height
+            );
+            ctx.stroke();
+          }
           break;
         case "circle":
-          ctx.beginPath();
-          ctx.arc(
-            element.data.centerX,
-            element.data.centerY,
-            element.data.radius,
-            0,
-            2 * Math.PI
-          );
-          ctx.stroke();
+          if (
+            element.data.x !== undefined &&
+            element.data.y !== undefined &&
+            element.data.radius !== undefined
+          ) {
+            ctx.beginPath();
+            ctx.arc(
+              element.data.x,
+              element.data.y,
+              element.data.radius,
+              0,
+              2 * Math.PI
+            );
+            ctx.stroke();
+          }
           break;
         case "text":
-          ctx.font = `${element.style.strokeWidth * 8}px Arial`;
-          ctx.fillStyle = element.style.color;
-          ctx.fillText(element.data.text, element.data.x, element.data.y);
+          if (
+            element.data.text &&
+            element.data.x !== undefined &&
+            element.data.y !== undefined
+          ) {
+            ctx.font = `${element.style.strokeWidth * 8}px Arial`;
+            ctx.fillStyle = element.style.color;
+            ctx.fillText(element.data.text, element.data.x, element.data.y);
+          }
           break;
       }
     });
@@ -169,13 +188,15 @@ export function WhiteboardCanvas({
       // Erase elements at current position
       const eraserRadius = strokeWidth * 5;
       const remainingElements = elements.filter((element) => {
-        if (element.type === "path") {
-          return !element.data.some((point: { x: number; y: number }) => {
-            const distance = Math.sqrt(
-              Math.pow(point.x - pos.x, 2) + Math.pow(point.y - pos.y, 2)
-            );
-            return distance < eraserRadius;
-          });
+        if (element.type === "path" && element.data.points) {
+          return !element.data.points.some(
+            (point: { x: number; y: number }) => {
+              const distance = Math.sqrt(
+                Math.pow(point.x - pos.x, 2) + Math.pow(point.y - pos.y, 2)
+              );
+              return distance < eraserRadius;
+            }
+          );
         }
         return true;
       });
@@ -196,7 +217,7 @@ export function WhiteboardCanvas({
       const newElement: DrawingElement = {
         type: "path",
         id: Date.now().toString(),
-        data: [...currentPath, pos],
+        data: { points: [...currentPath, pos] },
         style: { color: strokeColor, strokeWidth },
       };
       onElementsChange([...elements, newElement]);
@@ -221,8 +242,8 @@ export function WhiteboardCanvas({
         type: "circle",
         id: Date.now().toString(),
         data: {
-          centerX: startPoint.x,
-          centerY: startPoint.y,
+          x: startPoint.x,
+          y: startPoint.y,
           radius,
         },
         style: { color: strokeColor, strokeWidth },

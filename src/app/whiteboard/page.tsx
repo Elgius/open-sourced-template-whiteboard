@@ -20,7 +20,15 @@ export interface Drawing {
 export interface DrawingElement {
   type: "path" | "text" | "rectangle" | "circle";
   id: string;
-  data: any;
+  data: {
+    points?: { x: number; y: number }[];
+    text?: string;
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+    radius?: number;
+  };
   style: {
     color: string;
     strokeWidth: number;

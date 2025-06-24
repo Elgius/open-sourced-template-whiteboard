@@ -4,6 +4,7 @@ import { useState } from "react";
 import { WhiteboardCanvas } from "@/components/whiteboard-canvas";
 import { ToolPalette } from "@/components/tool-pallete";
 import { DrawingManager } from "@/components/drawing-manager";
+import { SaveDialog } from "@/components/save-dialog";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Save, FolderOpen } from "lucide-react";
@@ -42,12 +43,17 @@ export default function WhiteboardApp() {
   const [elements, setElements] = useState<DrawingElement[]>([]);
   const [currentDrawing, setCurrentDrawing] = useState<Drawing | null>(null);
   const [showDrawingManager, setShowDrawingManager] = useState(false);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
-  const saveDrawing = async () => {
+  const handleSaveClick = () => {
+    setShowSaveDialog(true);
+  };
+
+  const saveDrawing = async (drawingName: string) => {
+    setIsSaving(true);
     try {
       const drawingData = JSON.stringify(elements);
-      const drawingName =
-        currentDrawing?.name || `Drawing ${new Date().toLocaleString()}`;
 
       const response = await fetch("/api/drawings", {
         method: currentDrawing ? "PUT" : "POST",
@@ -64,12 +70,21 @@ export default function WhiteboardApp() {
       if (response.ok) {
         const savedDrawing = await response.json();
         setCurrentDrawing(savedDrawing);
+        setShowSaveDialog(false);
         alert("Drawing saved successfully!");
+      } else {
+        throw new Error("Failed to save drawing");
       }
     } catch (error) {
       console.error("Error saving drawing:", error);
       alert("Failed to save drawing");
+    } finally {
+      setIsSaving(false);
     }
+  };
+
+  const handleSaveCancel = () => {
+    setShowSaveDialog(false);
   };
 
   const loadDrawing = (drawing: Drawing) => {
@@ -102,7 +117,7 @@ export default function WhiteboardApp() {
             <Button onClick={newDrawing} variant="outline" size="sm">
               New
             </Button>
-            <Button onClick={saveDrawing} variant="outline" size="sm">
+            <Button onClick={handleSaveClick} variant="outline" size="sm">
               <Save className="w-4 h-4 mr-2" />
               Save
             </Button>
@@ -153,6 +168,16 @@ export default function WhiteboardApp() {
             />
           </Card>
         </div>
+      )}
+
+      {/* Save Dialog */}
+      {showSaveDialog && (
+        <SaveDialog
+          currentName={currentDrawing?.name || ""}
+          onSave={saveDrawing}
+          onCancel={handleSaveCancel}
+          isLoading={isSaving}
+        />
       )}
     </div>
   );

@@ -234,10 +234,29 @@ export function WhiteboardCanvas({
     setStartPoint(null);
   };
 
+  // Get cursor style based on current tool
+  const getCursorClass = () => {
+    switch (tool) {
+      case "pen":
+        return "cursor-pen";
+      case "eraser":
+        return "cursor-eraser";
+      case "text":
+        return "cursor-text";
+      case "rectangle":
+      case "circle":
+        return "cursor-crosshair-black";
+      case "select":
+        return "cursor-pointer";
+      default:
+        return "cursor-crosshair-black";
+    }
+  };
+
   return (
     <canvas
       ref={canvasRef}
-      className="w-full h-full cursor-crosshair bg-white"
+      className={`w-full h-full bg-white ${getCursorClass()}`}
       onMouseDown={handleMouseDown}
       onMouseMove={handleMouseMove}
       onMouseUp={handleMouseUp}

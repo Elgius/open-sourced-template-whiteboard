@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Plus, Trash2, ChevronLeft, ChevronRight } from "lucide-react";
 import type { WhiteboardPage } from "../app/whiteboard/page";

@@ -1,13 +1,15 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { WhiteboardCanvas } from "@/components/whiteboard-canvas";
 import { ToolPalette } from "@/components/tool-pallete";
 import { DrawingManager } from "@/components/drawing-manager";
 import { SaveDialog } from "@/components/save-dialog";
+import { PageNavigator } from "@/components/page-navigator";
+import { PageOverview } from "@/components/page-overview";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Save, FolderOpen } from "lucide-react";
+import { Save, FolderOpen, Layout } from "lucide-react";
 
 export interface Drawing {
   id: string;
@@ -36,6 +38,15 @@ export interface DrawingElement {
   };
 }
 
+export interface WhiteboardPage {
+  id: string;
+  elements: DrawingElement[];
+}
+
+export interface WhiteboardData {
+  pages: WhiteboardPage[];
+}
+
 export type Tool =
   | "pen"
   | "eraser"
@@ -48,11 +59,72 @@ export default function WhiteboardApp() {
   const [currentTool, setCurrentTool] = useState<Tool>("pen");
   const [strokeColor, setStrokeColor] = useState("#000000");
   const [strokeWidth, setStrokeWidth] = useState(2);
-  const [elements, setElements] = useState<DrawingElement[]>([]);
+
+  // Multi-page state
+  const [pages, setPages] = useState<WhiteboardPage[]>([
+    { id: "1", elements: [] },
+  ]);
+  const [currentPageIndex, setCurrentPageIndex] = useState(0);
+
   const [currentDrawing, setCurrentDrawing] = useState<Drawing | null>(null);
   const [showDrawingManager, setShowDrawingManager] = useState(false);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [showPageOverview, setShowPageOverview] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Get current page elements
+  const currentElements = pages[currentPageIndex]?.elements || [];
+
+  // Update current page elements
+  const setCurrentElements = (elements: DrawingElement[]) => {
+    setPages((prevPages) => {
+      const newPages = [...prevPages];
+      newPages[currentPageIndex] = {
+        ...newPages[currentPageIndex],
+        elements,
+      };
+      return newPages;
+    });
+  };
+
+  // Page management functions
+  const addNewPage = () => {
+    const newPage: WhiteboardPage = {
+      id: Date.now().toString(),
+      elements: [],
+    };
+    setPages((prevPages) => [...prevPages, newPage]);
+    setCurrentPageIndex(pages.length);
+  };
+
+  const deletePage = (pageIndex: number) => {
+    if (pages.length <= 1) return; // Don't delete the last page
+
+    if (confirm("Are you sure you want to delete this page?")) {
+      setPages((prevPages) =>
+        prevPages.filter((_, index) => index !== pageIndex)
+      );
+
+      // Adjust current page index if necessary
+      if (currentPageIndex >= pageIndex && currentPageIndex > 0) {
+        setCurrentPageIndex(currentPageIndex - 1);
+      } else if (currentPageIndex >= pages.length - 1) {
+        setCurrentPageIndex(pages.length - 2);
+      }
+    }
+  };
+
+  const goToPreviousPage = () => {
+    if (currentPageIndex > 0) {
+      setCurrentPageIndex(currentPageIndex - 1);
+    }
+  };
+
+  const goToNextPage = () => {
+    if (currentPageIndex < pages.length - 1) {
+      setCurrentPageIndex(currentPageIndex + 1);
+    }
+  };
 
   const handleSaveClick = () => {
     setShowSaveDialog(true);
@@ -61,7 +133,8 @@ export default function WhiteboardApp() {
   const saveDrawing = async (drawingName: string) => {
     setIsSaving(true);
     try {
-      const drawingData = JSON.stringify(elements);
+      const whiteboardData: WhiteboardData = { pages };
+      const drawingData = JSON.stringify(whiteboardData);
 
       const response = await fetch("/api/drawings", {
         method: currentDrawing ? "PUT" : "POST",
@@ -97,8 +170,19 @@ export default function WhiteboardApp() {
 
   const loadDrawing = (drawing: Drawing) => {
     try {
-      const parsedElements = JSON.parse(drawing.data);
-      setElements(parsedElements);
+      const parsedData = JSON.parse(drawing.data);
+
+      // Handle backward compatibility - if data is array of elements, convert to pages format
+      if (Array.isArray(parsedData)) {
+        const legacyElements = parsedData as DrawingElement[];
+        setPages([{ id: "1", elements: legacyElements }]);
+      } else {
+        // New format with pages
+        const whiteboardData = parsedData as WhiteboardData;
+        setPages(whiteboardData.pages || [{ id: "1", elements: [] }]);
+      }
+
+      setCurrentPageIndex(0);
       setCurrentDrawing(drawing);
       setShowDrawingManager(false);
     } catch (error) {
@@ -108,10 +192,48 @@ export default function WhiteboardApp() {
   };
 
   const newDrawing = () => {
-    setElements([]);
+    setPages([{ id: "1", elements: [] }]);
+    setCurrentPageIndex(0);
     setCurrentDrawing(null);
     setShowDrawingManager(false);
   };
+
+  // Keyboard shortcuts for page navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle shortcuts when not in an input field
+      if (
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement
+      ) {
+        return;
+      }
+
+      if (e.ctrlKey || e.metaKey) {
+        switch (e.key) {
+          case "ArrowLeft":
+            e.preventDefault();
+            goToPreviousPage();
+            break;
+          case "ArrowRight":
+            e.preventDefault();
+            goToNextPage();
+            break;
+          case "n":
+            e.preventDefault();
+            addNewPage();
+            break;
+          case "s":
+            e.preventDefault();
+            handleSaveClick();
+            break;
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [currentPageIndex, pages.length]);
 
   return (
     <div className="h-screen flex flex-col bg-gray-50">
@@ -137,8 +259,27 @@ export default function WhiteboardApp() {
               <FolderOpen className="w-4 h-4 mr-2" />
               Open
             </Button>
+            <Button
+              onClick={() => setShowPageOverview(true)}
+              variant="outline"
+              size="sm"
+            >
+              <Layout className="w-4 h-4 mr-2" />
+              Pages
+            </Button>
           </div>
         </div>
+
+        {/* Page Navigation */}
+        <PageNavigator
+          pages={pages}
+          currentPageIndex={currentPageIndex}
+          onPageChange={setCurrentPageIndex}
+          onAddPage={addNewPage}
+          onDeletePage={deletePage}
+          onPreviousPage={goToPreviousPage}
+          onNextPage={goToNextPage}
+        />
       </div>
 
       <div className="flex-1 flex">
@@ -155,14 +296,28 @@ export default function WhiteboardApp() {
         </div>
 
         {/* Canvas Area */}
-        <div className="flex-1 relative">
-          <WhiteboardCanvas
-            tool={currentTool}
-            strokeColor={strokeColor}
-            strokeWidth={strokeWidth}
-            elements={elements}
-            onElementsChange={setElements}
-          />
+        <div className="flex-1 relative flex">
+          <div className="flex-1">
+            <WhiteboardCanvas
+              tool={currentTool}
+              strokeColor={strokeColor}
+              strokeWidth={strokeWidth}
+              elements={currentElements}
+              onElementsChange={setCurrentElements}
+            />
+          </div>
+
+          {/* Page Overview Sidebar */}
+          {showPageOverview && (
+            <PageOverview
+              pages={pages}
+              currentPageIndex={currentPageIndex}
+              onPageChange={setCurrentPageIndex}
+              onAddPage={addNewPage}
+              onDeletePage={deletePage}
+              onClose={() => setShowPageOverview(false)}
+            />
+          )}
         </div>
       </div>
 

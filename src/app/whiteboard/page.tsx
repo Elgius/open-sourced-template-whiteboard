@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { WhiteboardCanvas } from "@/components/whiteboard-canvas";
 import { ToolPalette } from "@/components/tool-pallete";
 import { DrawingManager } from "@/components/drawing-manager";
@@ -86,7 +86,10 @@ export default function WhiteboardApp() {
   const lastActivityRef = useRef<Date>(new Date());
 
   // Get current page elements
-  const currentElements = pages[currentPageIndex]?.elements || [];
+  const currentElements = useMemo(
+    () => pages[currentPageIndex]?.elements || [],
+    [pages, currentPageIndex]
+  );
 
   // Get history store functions
   const { saveState, undo, redo, canUndo, canRedo } = useHistoryStore();
@@ -522,7 +525,16 @@ export default function WhiteboardApp() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentPageIndex, pages.length, trackActivity, handleUndo, handleRedo]);
+  }, [
+    currentPageIndex,
+    pages.length,
+    trackActivity,
+    handleUndo,
+    handleRedo,
+    addNewPage,
+    goToNextPage,
+    goToPreviousPage,
+  ]);
 
   // Track activity when elements change (drawing/editing)
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { DrawingElement, WhiteboardPage } from "@/app/whiteboard/page";
+import type { WhiteboardPage } from "@/app/whiteboard/page";
 
 interface HistoryState {
   past: WhiteboardPage[][];
@@ -33,7 +33,7 @@ export const useHistoryStore = create<HistoryState>((set, get) => ({
   },
 
   undo: () => {
-    const { past, future } = get();
+    const { past } = get();
 
     if (past.length === 0) return undefined;
 

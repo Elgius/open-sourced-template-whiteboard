@@ -10,7 +10,8 @@ import { PageOverview } from "@/components/page-overview";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { Save, FolderOpen, Layout, X } from "lucide-react";
+import { Save, FolderOpen, Layout, X, Undo, Redo } from "lucide-react";
+import { useHistoryStore } from "@/lib/store";
 
 export interface Drawing {
   id: string;
@@ -87,8 +88,21 @@ export default function WhiteboardApp() {
   // Get current page elements
   const currentElements = pages[currentPageIndex]?.elements || [];
 
+  // Get history store functions
+  const { saveState, undo, redo, canUndo, canRedo } = useHistoryStore();
+
   // Update current page elements
   const setCurrentElements = (elements: DrawingElement[]) => {
+    // Check if this is a significant change that should be saved in history
+    const isSignificantChange =
+      elements.length !== currentElements.length ||
+      JSON.stringify(elements) !== JSON.stringify(currentElements);
+
+    // If it's a significant change, save the current state before updating
+    if (isSignificantChange) {
+      saveState([...pages]);
+    }
+
     setPages((prevPages) => {
       const newPages = [...prevPages];
       newPages[currentPageIndex] = {
@@ -97,6 +111,22 @@ export default function WhiteboardApp() {
       };
       return newPages;
     });
+  };
+
+  // Handle undo action
+  const handleUndo = () => {
+    const previousState = undo();
+    if (previousState) {
+      setPages(previousState);
+    }
+  };
+
+  // Handle redo action
+  const handleRedo = () => {
+    const nextState = redo();
+    if (nextState) {
+      setPages(nextState);
+    }
   };
 
   // Check for unsaved changes before performing an action
@@ -408,6 +438,9 @@ export default function WhiteboardApp() {
       setCurrentDrawing(drawing);
       setShowDrawingManager(false);
 
+      // Clear undo/redo history when loading a new drawing
+      useHistoryStore.getState().clear();
+
       // Start activity tracking for the new drawing
       trackActivity();
     } catch (error) {
@@ -426,6 +459,9 @@ export default function WhiteboardApp() {
     setCurrentPageIndex(0);
     setCurrentDrawing(null);
     setShowDrawingManager(false);
+
+    // Clear undo/redo history when creating a new drawing
+    useHistoryStore.getState().clear();
 
     // Clear autosave timer since we don't have a drawing to save
     if (autosaveTimeoutRef.current) {
@@ -462,6 +498,21 @@ export default function WhiteboardApp() {
             e.preventDefault();
             handleSaveClick();
             break;
+          case "z":
+            e.preventDefault();
+            if (e.shiftKey) {
+              // Ctrl+Shift+Z or Cmd+Shift+Z for Redo
+              handleRedo();
+            } else {
+              // Ctrl+Z or Cmd+Z for Undo
+              handleUndo();
+            }
+            break;
+          case "y":
+            // Ctrl+Y or Cmd+Y for Redo (alternative)
+            e.preventDefault();
+            handleRedo();
+            break;
         }
       }
 
@@ -471,7 +522,7 @@ export default function WhiteboardApp() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentPageIndex, pages.length, trackActivity]);
+  }, [currentPageIndex, pages.length, trackActivity, handleUndo, handleRedo]);
 
   // Track activity when elements change (drawing/editing)
   useEffect(() => {
@@ -690,6 +741,28 @@ export default function WhiteboardApp() {
               <FolderOpen className="w-4 h-4 mr-2" />
               Open
             </Button>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleUndo}
+                disabled={!canUndo}
+                title="Undo"
+                className="h-9 w-9"
+              >
+                <Undo className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleRedo}
+                disabled={!canRedo}
+                title="Redo"
+                className="h-9 w-9"
+              >
+                <Redo className="w-4 h-4" />
+              </Button>
+            </div>
             <Button
               onClick={() => setShowPageOverview(true)}
               variant="outline"
